@@ -1,0 +1,207 @@
+/* Tailwind CSS Foundation and Custom Styles for AI Swarm Orchestrator UI */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark Theme CSS Variables */
+:root {
+  --color-bg: #ffffff;
+  --color-text: #1a202c;
+  --color-primary: #4f46e5;
+  --color-secondary: #6b7280;
+  --color-accent: #3b82f6;
+  --scrollbar-bg: #e5e7eb;
+  --scrollbar-thumb: #9ca3af;
+}
+
+[data-theme="dark"] {
+  --color-bg: #1a202c;
+  --color-text: #f9fafb;
+  --color-primary: #8b5cf6;
+  --color-secondary: #d1d5db;
+  --color-accent: #60a5fa;
+  --scrollbar-bg: #374151;
+  --scrollbar-thumb: #6b7280;
+}
+
+/* Global Styles */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 12px;
+  background-color: var(--scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 6px;
+  border: 3px solid var(--scrollbar-bg);
+}
+
+/* Glassmorphism Effects */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  transition: background 0.3s ease;
+}
+
+[data-theme="dark"] .glass {
+  background: rgba(26, 32, 44, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Gradient Text Utilities */
+.text-gradient {
+  background: linear-gradient(90deg, #4f46e5, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(90deg, #8b5cf6, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Neural Network Animation Effects */
+@keyframes neuralPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px 2px rgba(79, 70, 229, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 20px 6px rgba(79, 70, 229, 1);
+  }
+}
+
+.neural-node {
+  width: 20px;
+  height: 20px;
+  background-color: var(--color-primary);
+  border-radius: 50%;
+  animation: neuralPulse 2s ease-in-out infinite;
+  margin: 0 8px;
+}
+
+.neural-connection {
+  height: 4px;
+  background: var(--color-accent);
+  flex-grow: 1;
+  margin: auto 4px;
+  border-radius: 2px;
+  animation: neuralPulse 2s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+/* Loading Animations */
+@keyframes loadingSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loader {
+  border: 4px solid var(--color-secondary);
+  border-top: 4px solid var(--color-primary);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  animation: loadingSpin 1s linear infinite;
+}
+
+/* Glitch Effects for Error States */
+@keyframes glitch {
+  0% {
+    clip: rect(44px, 9999px, 56px, 0);
+    transform: translate(-2px, -2px);
+  }
+  20% {
+    clip: rect(12px, 9999px, 85px, 0);
+    transform: translate(2px, 2px);
+  }
+  40% {
+    clip: rect(85px, 9999px, 140px, 0);
+    transform: translate(-2px, 2px);
+  }
+  60% {
+    clip: rect(44px, 9999px, 56px, 0);
+    transform: translate(2px, -2px);
+  }
+  80% {
+    clip: rect(12px, 9999px, 85px, 0);
+    transform: translate(-2px, 2px);
+  }
+  100% {
+    clip: rect(85px, 9999px, 140px, 0);
+    transform: translate(2px, -2px);
+  }
+}
+
+.glitch {
+  position: relative;
+  color: var(--color-primary);
+  font-weight: 900;
+  font-size: 2rem;
+  animation: glitch 1s infinite;
+}
+
+.glitch::before, .glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+}
+
+.glitch::before {
+  left: 2px;
+  text-shadow: -2px 0 red;
+  animation: glitch 1s infinite;
+  animation-delay: 0.2s;
+}
+
+.glitch::after {
+  left: -2px;
+  text-shadow: -2px 0 blue;
+  animation: glitch 1s infinite;
+  animation-delay: 0.4s;
+}
+
+/* Utility Classes for UI Enhancements */
+.bg-primary {
+  background-color: var(--color-primary) !important;
+}
+
+.text-primary {
+  color: var(--color-primary) !important;
+}
+
+.bg-accent {
+  background-color: var(--color-accent) !important;
+}
+
+.text-accent {
+  color: var(--color-accent) !important;
+}
+
+/* Responsive Utilities */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
+}
+
