@@ -1,0 +1,375 @@
+  name: Universal GitHub Pages Deploy
+  
+  on:
+    push:
+      branches:
+        - main
+        - master
+        - gh-pages
+    pull_request:
+      branches:
+        - main
+        - master
+    workflow_dispatch:
+  
+  permissions:
+    contents: read
+    pages: write
+    id-token: write
+  
+  concurrency:
+    group: "pages"
+    cancel-in-progress: false
+  
+  jobs:
+    # Job 1: Detect project type and build accordingly
+    detect-and-build:
+      runs-on: ubuntu-latest
+      outputs:
+        project-type: ${{ steps.detect.outputs.project_type }}
+        build-dir: ${{ steps.detect.outputs.build_dir }}
+      
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+  
+        - name: Detect Project Type
+          id: detect
+          run: |
+            echo "🔍 Detecting project type..."
+            
+            PROJECT_TYPE="static"
+            BUILD_DIR="."
+            
+            # Detect React/Vite
+            if [ -f "package.json" ]; then
+              if grep -q "vite" package.json; then
+                PROJECT_TYPE="vite"
+                BUILD_DIR="dist"
+                echo "✅ Detected: Vite project"
+              elif grep -q "react-scripts" package.json; then
+                PROJECT_TYPE="react"
+                BUILD_DIR="build"
+                echo "✅ Detected: Create React App"
+              elif grep -q "next" package.json; then
+                PROJECT_TYPE="nextjs"
+                BUILD_DIR="out"
+                echo "✅ Detected: Next.js"
+              elif grep -q "gatsby" package.json; then
+                PROJECT_TYPE="gatsby"
+                BUILD_DIR="public"
+                echo "✅ Detected: Gatsby"
+              elif grep -q "vue" package.json; then
+                PROJECT_TYPE="vue"
+                BUILD_DIR="dist"
+                echo "✅ Detected: Vue.js"
+              elif grep -q "angular" package.json; then
+                PROJECT_TYPE="angular"
+                BUILD_DIR="dist"
+                echo "✅ Detected: Angular"
+              else
+                PROJECT_TYPE="node"
+                BUILD_DIR="dist"
+                echo "✅ Detected: Node.js project"
+              fi
+            fi
+            
+            # Detect Jekyll
+            if [ -f "_config.yml" ] || [ -f "Gemfile" ]; then
+              PROJECT_TYPE="jekyll"
+              BUILD_DIR="_site"
+              echo "✅ Detected: Jekyll"
+            fi
+            
+            # Detect Hugo
+            if [ -f "config.toml" ] || [ -f "config.yaml" ] || [ -f "hugo.toml" ]; then
+              PROJECT_TYPE="hugo"
+              BUILD_DIR="public"
+              echo "✅ Detected: Hugo"
+            fi
+            
+            # Detect MkDocs
+            if [ -f "mkdocs.yml" ]; then
+              PROJECT_TYPE="mkdocs"
+              BUILD_DIR="site"
+              echo "✅ Detected: MkDocs"
+            fi
+            
+            # Detect Docusaurus
+            if [ -f "docusaurus.config.js" ] || [ -f "docusaurus.config.ts" ]; then
+              PROJECT_TYPE="docusaurus"
+              BUILD_DIR="build"
+              echo "✅ Detected: Docusaurus"
+            fi
+            
+            # Detect Astro
+            if [ -f "astro.config.mjs" ] || [ -f "astro.config.js" ]; then
+              PROJECT_TYPE="astro"
+              BUILD_DIR="dist"
+              echo "✅ Detected: Astro"
+            fi
+            
+            # Detect Svelte/SvelteKit
+            if [ -f "svelte.config.js" ]; then
+              PROJECT_TYPE="svelte"
+              BUILD_DIR="build"
+              echo "✅ Detected: SvelteKit"
+            fi
+            
+            # Detect Python/Sphinx
+            if [ -f "conf.py" ] || [ -f "docs/conf.py" ]; then
+              PROJECT_TYPE="sphinx"
+              BUILD_DIR="_build/html"
+              echo "✅ Detected: Sphinx"
+            fi
+            
+            # Detect Rust/mdBook
+            if [ -f "book.toml" ]; then
+              PROJECT_TYPE="mdbook"
+              BUILD_DIR="book"
+              echo "✅ Detected: mdBook"
+            fi
+            
+            # Detect plain HTML
+            if [ -f "index.html" ] && [ "$PROJECT_TYPE" = "static" ]; then
+              PROJECT_TYPE="html"
+              BUILD_DIR="."
+              echo "✅ Detected: Static HTML"
+            fi
+            
+            # Check for common build directories
+            if [ -d "public" ] && [ "$PROJECT_TYPE" = "static" ]; then
+              BUILD_DIR="public"
+            elif [ -d "dist" ] && [ "$PROJECT_TYPE" = "static" ]; then
+              BUILD_DIR="dist"
+            elif [ -d "build" ] && [ "$PROJECT_TYPE" = "static" ]; then
+              BUILD_DIR="build"
+            elif [ -d "docs" ] && [ "$PROJECT_TYPE" = "static" ]; then
+              BUILD_DIR="docs"
+            fi
+            
+            echo "project_type=$PROJECT_TYPE" >> $GITHUB_OUTPUT
+            echo "build_dir=$BUILD_DIR" >> $GITHUB_OUTPUT
+            echo "📦 Project Type: $PROJECT_TYPE"
+            echo "📂 Build Directory: $BUILD_DIR"
+  
+        - name: Setup Node.js
+          if: contains(fromJSON('["vite","react","nextjs","gatsby","vue","angular","node","docusaurus","astro","svelte"]'), steps.detect.outputs.project_type)
+          uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+            cache: 'npm'
+  
+        - name: Setup Ruby
+          if: steps.detect.outputs.project_type == 'jekyll'
+          uses: ruby/setup-ruby@v1
+          with:
+            ruby-version: '3.2'
+            bundler-cache: true
+  
+        - name: Setup Hugo
+          if: steps.detect.outputs.project_type == 'hugo'
+          uses: peaceiris/actions-hugo@v2
+          with:
+            hugo-version: 'latest'
+            extended: true
+  
+        - name: Setup Python
+          if: contains(fromJSON('["mkdocs","sphinx"]'), steps.detect.outputs.project_type)
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.x'
+  
+        - name: Setup Rust
+          if: steps.detect.outputs.project_type == 'mdbook'
+          uses: actions-rs/toolchain@v1
+          with:
+            toolchain: stable
+  
+        - name: Install Dependencies
+          run: |
+            PROJECT_TYPE="${{ steps.detect.outputs.project_type }}"
+            
+            echo "📦 Installing dependencies for $PROJECT_TYPE..."
+            
+            case $PROJECT_TYPE in
+              vite|react|nextjs|gatsby|vue|angular|node|docusaurus|astro|svelte)
+                if [ -f "package-lock.json" ]; then
+                  npm ci
+                elif [ -f "yarn.lock" ]; then
+                  yarn install --frozen-lockfile
+                elif [ -f "pnpm-lock.yaml" ]; then
+                  npm install -g pnpm
+                  pnpm install --frozen-lockfile
+                else
+                  npm install
+                fi
+                ;;
+              jekyll)
+                bundle install
+                ;;
+              mkdocs)
+                pip install mkdocs mkdocs-material
+                if [ -f "requirements.txt" ]; then
+                  pip install -r requirements.txt
+                fi
+                ;;
+              sphinx)
+                pip install sphinx sphinx-rtd-theme
+                if [ -f "requirements.txt" ]; then
+                  pip install -r requirements.txt
+                fi
+                ;;
+              mdbook)
+                cargo install mdbook
+                ;;
+              *)
+                echo "ℹ️  No dependencies to install for $PROJECT_TYPE"
+                ;;
+            esac
+  
+        - name: Build Project
+          run: |
+            PROJECT_TYPE="${{ steps.detect.outputs.project_type }}"
+            
+            echo "🔨 Building $PROJECT_TYPE project..."
+            
+            case $PROJECT_TYPE in
+              vite)
+                npm run build
+                ;;
+              react)
+                npm run build
+                ;;
+              nextjs)
+                npm run build
+                npm run export || echo "Using static export"
+                ;;
+              gatsby)
+                npm run build
+                ;;
+              vue)
+                npm run build
+                ;;
+              angular)
+                npm run build -- --configuration production --base-href /$(echo $GITHUB_REPOSITORY | cut -d'/' -f2)/
+                ;;
+              node)
+                npm run build || echo "No build script found"
+                ;;
+              jekyll)
+                bundle exec jekyll build --baseurl "/${{ github.event.repository.name }}"
+                ;;
+              hugo)
+                hugo --minify --baseURL "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+                ;;
+              mkdocs)
+                mkdocs build
+                ;;
+              sphinx)
+                if [ -f "docs/conf.py" ]; then
+                  cd docs && make html && cd ..
+                else
+                  sphinx-build -b html . _build/html
+                fi
+                ;;
+              docusaurus)
+                npm run build
+                ;;
+              astro)
+                npm run build
+                ;;
+              svelte)
+                npm run build
+                ;;
+              mdbook)
+                mdbook build
+                ;;
+              html|static)
+                echo "ℹ️  Static files, no build needed"
+                ;;
+              *)
+                echo "⚠️  Unknown project type, attempting generic build"
+                if [ -f "package.json" ]; then
+                  npm run build || echo "No build script"
+                fi
+                ;;
+            esac
+  
+        - name: Auto-fix Build Directory
+          run: |
+            BUILD_DIR="${{ steps.detect.outputs.build_dir }}"
+            
+            echo "🔍 Verifying build directory: $BUILD_DIR"
+            
+            # If specified build dir doesn't exist, try to find it
+            if [ ! -d "$BUILD_DIR" ] || [ ! -f "$BUILD_DIR/index.html" ]; then
+              echo "⚠️  Build directory not found or missing index.html, searching..."
+              
+              for dir in dist build out public _site site docs .; do
+                if [ -f "$dir/index.html" ]; then
+                  BUILD_DIR="$dir"
+                  echo "✅ Found build directory: $BUILD_DIR"
+                  echo "build_dir=$BUILD_DIR" >> $GITHUB_OUTPUT
+                  break
+                fi
+              done
+            fi
+            
+            # Create index.html if it doesn't exist
+            if [ ! -f "$BUILD_DIR/index.html" ]; then
+              echo "⚠️  No index.html found, creating default..."
+              mkdir -p "$BUILD_DIR"
+              cat > "$BUILD_DIR/index.html" << 'EOF'
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${{ github.event.repository.name }}</title>
+                <style>
+                    body { font-family: system-ui; max-width: 800px; margin: 50px auto; padding: 20px; }
+                    h1 { color: #333; }
+                    .info { background: #f0f0f0; padding: 15px; border-radius: 5px; }
+                </style>
+            </head>
+            <body>
+                <h1>🚀 ${{ github.event.repository.name }}</h1>
+                <div class="info">
+                    <p><strong>Repository:</strong> ${{ github.repository }}</p>
+                    <p><strong>Last Updated:</strong> ${{ github.event.head_commit.timestamp }}</p>
+                    <p>This page was automatically generated by GitHub Actions.</p>
+                </div>
+            </body>
+            </html>
+            EOF
+            fi
+            
+            echo "✅ Build directory ready: $BUILD_DIR"
+  
+        - name: Upload Artifact
+          uses: actions/upload-pages-artifact@v3
+          with:
+            path: ${{ steps.detect.outputs.build_dir }}
+  
+    # Job 2: Deploy to GitHub Pages
+    deploy:
+      environment:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+      runs-on: ubuntu-latest
+      needs: detect-and-build
+      
+      steps:
+        - name: Deploy to GitHub Pages
+          id: deployment
+          uses: actions/deploy-pages@v4
+  
+        - name: Display Deployment Info
+          run: |
+            echo "🎉 Deployment successful!"
+            echo "🌐 Site URL: ${{ steps.deployment.outputs.page_url }}"
+            echo "📦 Project Type: ${{ needs.detect-and-build.outputs.project-type }}"
+            echo "📂 Build Directory: ${{ needs.detect-and-build.outputs.build-dir }}"
