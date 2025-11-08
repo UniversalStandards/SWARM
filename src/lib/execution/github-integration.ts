@@ -58,8 +58,8 @@ export class GitHubIntegration {
         });
         return {
           path: file.path,
-          mode: "100644",
-          type: "blob",
+          mode: "100644" as const,
+          type: "blob" as const,
           sha: blobData.sha,
         };
       })

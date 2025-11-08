@@ -202,4 +202,5 @@ class ExecutionHistoryManager {
   }
 }
 
-export { ExecutionHistoryManager, ExecutionRecord };
+export { ExecutionHistoryManager };
+export type { ExecutionRecord };

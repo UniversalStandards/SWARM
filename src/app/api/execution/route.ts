@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
+
+interface ExecutionData {
+  id: number;
+  workflowId: string;
+  status: string;
+  startTime: Date;
+  endTime?: Date;
+  logs: string[];
+  [key: string]: any;
+}
 
 // In-memory storage for executions
-const executions = new Map();
+const executions = new Map<number, ExecutionData>();
 let executionIdCounter = 1;
 
 // WebSocket server instance
-let wss;
+let wss: WebSocketServer | null = null;
 
 // Initialize WebSocket server if not already initialized
-function initWebSocketServer() {
+function initWebSocketServer(): void {
   if (!wss) {
     wss = new WebSocketServer({ noServer: true });
-    wss.on("connection", (ws) => {
+    wss.on("connection", (ws: WebSocket) => {
       console.log("WebSocket client connected");
       ws.on("close", () => {
         console.log("WebSocket client disconnected");
@@ -22,10 +32,10 @@ function initWebSocketServer() {
 }
 
 // Broadcast message to all connected WebSocket clients
-function broadcast(message) {
+function broadcast(message: any): void {
   if (!wss) return;
-  wss.clients.forEach((client) => {
-    if (client.readyState === 1) {
+  wss.clients.forEach((client: WebSocket) => {
+    if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify(message));
     }
   });
@@ -41,12 +51,13 @@ export async function POST(request: NextRequest) {
   }
 
   const executionId = executionIdCounter++;
-  const execution = {
+  const execution: ExecutionData = {
     id: executionId,
     workflowId,
     parameters,
     status: "running",
-    startedAt: new Date().toISOString(),
+    startTime: new Date(),
+    logs: [],
   };
 
   executions.set(executionId, execution);
@@ -107,9 +118,13 @@ export async function GET_stats(request: NextRequest) {
 }
 
 // Export a handler for WebSocket upgrade
-export function onUpgrade(request, socket, head) {
+export function onUpgrade(request: any, socket: any, head: any): void {
   initWebSocketServer();
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit("connection", ws, request);
-  });
+  if (wss) {
+    wss.handleUpgrade(request, socket, head, (ws: WebSocket) => {
+      if (wss) {
+        wss.emit("connection", ws, request);
+      }
+    });
+  }
 }

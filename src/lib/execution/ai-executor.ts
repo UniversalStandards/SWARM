@@ -170,10 +170,13 @@ class GoogleGeminiProvider extends AIProvider {
 
       const response = result.response;
       const text = response.text();
+      
+      // Google AI SDK may not always provide usage metadata
+      const tokensUsed = (response as any).usageMetadata?.totalTokenCount || 0;
 
       return {
         text,
-        tokensUsed: response.usageMetadata?.totalTokenCount || 0,
+        tokensUsed,
         model: request.model || 'gemini-pro',
       };
     } catch (error: any) {
