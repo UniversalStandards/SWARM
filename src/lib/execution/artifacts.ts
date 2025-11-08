@@ -76,4 +76,5 @@ class ArtifactManager {
   }
 }
 
-export { ArtifactManager, Artifact };
+export { ArtifactManager };
+export type { Artifact };
