@@ -1,29 +1,53 @@
-class ExecutionQueueManager {
-  constructor() {
-    this.queue = [];
-    this.resources = {
-      cpu: 0,
-      memory: 0,
-      gpu: 0,
-    };
-    this.maxResources = {
-      cpu: 8, // example max CPU cores
-      memory: 32000, // example max memory in MB
-      gpu: 2, // example max GPU units
-    };
-    this.retryLimit = 3;
-    this.currentlyRunning = 0;
+interface ResourceRequirements {
+  cpu: number;
+  memory: number;
+  gpu: number;
+}
+
+interface QueueItem {
+  task: () => Promise<void>;
+  priority: number;
+  resourceRequirements: ResourceRequirements;
+  retries: number;
+  id: string;
+}
+
+export class ExecutionQueueManager {
+  private queue: QueueItem[] = [];
+  private resources: ResourceRequirements = {
+    cpu: 0,
+    memory: 0,
+    gpu: 0,
+  };
+  private maxResources: ResourceRequirements = {
+    cpu: 8, // max CPU cores
+    memory: 32000, // max memory in MB
+    gpu: 2, // max GPU units
+  };
+  private retryLimit: number = 3;
+  private currentlyRunning: number = 0;
+
+  constructor(maxResources?: Partial<ResourceRequirements>) {
+    if (maxResources) {
+      this.maxResources = { ...this.maxResources, ...maxResources };
+    }
   }
 
   // Add a task with priority and resource requirements
-  addTask(task, priority = 0, resourceRequirements = { cpu: 1, memory: 512, gpu: 0 }) {
-    this.queue.push({ task, priority, resourceRequirements, retries: 0 });
+  addTask(
+    task: () => Promise<void>,
+    priority: number = 0,
+    resourceRequirements: ResourceRequirements = { cpu: 1, memory: 512, gpu: 0 }
+  ): string {
+    const id = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this.queue.push({ task, priority, resourceRequirements, retries: 0, id });
     this.queue.sort((a, b) => b.priority - a.priority);
     this.processQueue();
+    return id;
   }
 
   // Check if resources are available for a task
-  canAllocateResources(resourceRequirements) {
+  private canAllocateResources(resourceRequirements: ResourceRequirements): boolean {
     return (
       this.resources.cpu + resourceRequirements.cpu <= this.maxResources.cpu &&
       this.resources.memory + resourceRequirements.memory <= this.maxResources.memory &&
@@ -32,21 +56,21 @@ class ExecutionQueueManager {
   }
 
   // Allocate resources for a task
-  allocateResources(resourceRequirements) {
+  private allocateResources(resourceRequirements: ResourceRequirements): void {
     this.resources.cpu += resourceRequirements.cpu;
     this.resources.memory += resourceRequirements.memory;
     this.resources.gpu += resourceRequirements.gpu;
   }
 
   // Release resources after task completion
-  releaseResources(resourceRequirements) {
+  private releaseResources(resourceRequirements: ResourceRequirements): void {
     this.resources.cpu -= resourceRequirements.cpu;
     this.resources.memory -= resourceRequirements.memory;
     this.resources.gpu -= resourceRequirements.gpu;
   }
 
   // Process the queue and run tasks if resources are available
-  processQueue() {
+  private processQueue(): void {
     if (this.queue.length === 0) return;
 
     for (let i = 0; i < this.queue.length; i++) {
@@ -61,7 +85,7 @@ class ExecutionQueueManager {
   }
 
   // Run a task with retry logic
-  async runTask(item) {
+  private async runTask(item: QueueItem): Promise<void> {
     this.currentlyRunning++;
     try {
       await item.task();
@@ -75,18 +99,50 @@ class ExecutionQueueManager {
         this.queue.push(item);
         this.queue.sort((a, b) => b.priority - a.priority);
       } else {
-        console.error('Task failed after retries:', error);
+        console.error(`Task ${item.id} failed after ${this.retryLimit} retries:`, error);
       }
       this.releaseResources(item.resourceRequirements);
       this.processQueue();
     }
   }
 
-  // Throughput optimization: adjust max resources dynamically (example placeholder)
-  optimizeThroughput() {
-    // Placeholder for dynamic resource adjustment logic
-    // Could monitor system load and adjust maxResources accordingly
+  // Get queue status
+  getStatus(): {
+    queueLength: number;
+    currentlyRunning: number;
+    resourceUsage: ResourceRequirements;
+    maxResources: ResourceRequirements;
+  } {
+    return {
+      queueLength: this.queue.length,
+      currentlyRunning: this.currentlyRunning,
+      resourceUsage: { ...this.resources },
+      maxResources: { ...this.maxResources },
+    };
+  }
+
+  // Dynamic resource optimization based on system load
+  optimizeThroughput(systemLoad?: { cpu: number; memory: number }): void {
+    if (!systemLoad) return;
+
+    // Dynamically adjust max resources based on current system load
+    if (systemLoad.cpu < 0.5) {
+      this.maxResources.cpu = Math.min(16, this.maxResources.cpu + 1);
+    } else if (systemLoad.cpu > 0.9) {
+      this.maxResources.cpu = Math.max(2, this.maxResources.cpu - 1);
+    }
+
+    if (systemLoad.memory < 0.5) {
+      this.maxResources.memory = Math.min(64000, this.maxResources.memory + 4000);
+    } else if (systemLoad.memory > 0.9) {
+      this.maxResources.memory = Math.max(8000, this.maxResources.memory - 4000);
+    }
+
+    this.processQueue();
+  }
+
+  // Clear all pending tasks
+  clearQueue(): void {
+    this.queue = [];
   }
 }
-
-module.exports = ExecutionQueueManager;

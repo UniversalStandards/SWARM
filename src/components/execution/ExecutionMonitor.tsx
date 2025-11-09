@@ -9,14 +9,32 @@ const TABS = [
   'Artifacts',
 ];
 
+interface NodeStatus {
+  id: number;
+  name: string;
+  status: string;
+}
+
+interface AgentActivity {
+  id: number;
+  agent: string;
+  activity: string;
+}
+
+interface Artifact {
+  id: number;
+  name: string;
+  url: string;
+}
+
 const ExecutionMonitor = () => {
   const [activeTab, setActiveTab] = useState('Progress');
   const [progress, setProgress] = useState(0);
-  const [nodeStatus, setNodeStatus] = useState([]);
-  const [agentActivity, setAgentActivity] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [artifacts, setArtifacts] = useState([]);
-  const logsEndRef = useRef(null);
+  const [nodeStatus, setNodeStatus] = useState<NodeStatus[]>([]);
+  const [agentActivity, setAgentActivity] = useState<AgentActivity[]>([]);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Simulate real-time data updates
   useEffect(() => {

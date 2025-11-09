@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { activeExecutionsRegistry } from "../../../../../../lib/activeExecutionsRegistry";
-import { websocketServer } from "../../../../../../lib/websocketServer";
+import { activeExecutionsRegistry } from "@/lib/activeExecutionsRegistry";
+import { wsManager } from "@/lib/websocketServer";
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const executionId = params.id;
@@ -31,10 +31,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Execution cannot be cancelled" }, { status: 400 });
     }
 
-    execution.cancel();
+    activeExecutionsRegistry.updateStatus(executionId, 'cancelled');
 
     // Notify clients via WebSocket
-    websocketServer.broadcast({
+    wsManager.broadcast({
       type: "execution_cancelled",
       executionId,
     });
