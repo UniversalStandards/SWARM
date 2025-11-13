@@ -1,0 +1,128 @@
+name: 🔄 Multi-Agent Workflow
+description: Create a complex multi-agent workflow with multiple nodes
+title: "[Workflow] "
+labels: ["agent-task", "workflow", "status:pending"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Multi-Agent Workflow Configuration
+        
+        Create a complex workflow with multiple agents working together.
+        The orchestrator will execute nodes in the correct order based on dependencies.
+
+  - type: input
+    id: workflow-name
+    attributes:
+      label: Workflow Name
+      description: Give your workflow a descriptive name
+      placeholder: "e.g., Data Processing Pipeline"
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow-description
+    attributes:
+      label: Workflow Description
+      description: Describe the overall goal of this workflow
+      placeholder: "Explain what this workflow should accomplish..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: execution-mode
+    attributes:
+      label: Execution Mode
+      description: How should the workflow be executed?
+      options:
+        - sequential
+        - parallel
+        - hybrid
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow-nodes
+    attributes:
+      label: Workflow Nodes (JSON)
+      description: Define all nodes in the workflow
+      placeholder: |
+        [
+          {
+            "id": "fetch-data",
+            "type": "agent",
+            "config": {
+              "agentType": "data-processor",
+              "task": "Fetch data from source"
+            }
+          },
+          {
+            "id": "analyze-data",
+            "type": "ai-task",
+            "config": {
+              "prompt": "Analyze the fetched data",
+              "model": "gpt-4"
+            }
+          },
+          {
+            "id": "generate-report",
+            "type": "agent",
+            "config": {
+              "agentType": "code-generator",
+              "task": "Generate report from analysis"
+            }
+          }
+        ]
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow-edges
+    attributes:
+      label: Workflow Edges (JSON)
+      description: Define connections between nodes
+      placeholder: |
+        [
+          { "from": "fetch-data", "to": "analyze-data" },
+          { "from": "analyze-data", "to": "generate-report" }
+        ]
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: initial-context
+    attributes:
+      label: Initial Context (JSON)
+      description: Provide initial variables and context for the workflow
+      placeholder: |
+        {
+          "dataSource": "https://api.example.com/data",
+          "outputFormat": "markdown",
+          "includeCharts": true
+        }
+      render: json
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: workflow-features
+    attributes:
+      label: Workflow Features
+      options:
+        - label: Enable error recovery and retries
+        - label: Create GitHub Project board for tracking
+        - label: Send notifications on completion
+        - label: Generate workflow visualization diagram
+        - label: Store intermediate results
+
+  - type: textarea
+    id: success-criteria
+    attributes:
+      label: Success Criteria
+      description: Define what constitutes successful workflow completion
+      placeholder: "List the criteria that indicate successful completion..."
+    validations:
+      required: false

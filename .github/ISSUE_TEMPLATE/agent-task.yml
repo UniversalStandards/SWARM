@@ -1,0 +1,118 @@
+name: 🤖 Agent Task
+description: Create a new AI agent task for execution
+title: "[Agent Task] "
+labels: ["agent-task", "status:pending"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## AI Agent Task Configuration
+        
+        This form creates a task that will be executed by the AI Agent Orchestrator.
+        Fill in the details below to configure your agent task.
+
+  - type: dropdown
+    id: agent-type
+    attributes:
+      label: Agent Type
+      description: Select the type of agent to execute this task
+      options:
+        - worker
+        - manager
+        - orchestrator
+        - ai-assistant
+        - code-generator
+        - data-processor
+        - custom
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Task priority level
+      options:
+        - low
+        - medium
+        - high
+        - critical
+      default: 1
+    validations:
+      required: true
+
+  - type: textarea
+    id: task-description
+    attributes:
+      label: Task Description
+      description: Describe what this agent should accomplish
+      placeholder: "Describe the task in detail..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: task-config
+    attributes:
+      label: Task Configuration (JSON)
+      description: Provide task configuration in JSON format
+      placeholder: |
+        {
+          "nodes": [
+            {
+              "id": "node1",
+              "type": "ai-task",
+              "config": {
+                "prompt": "Your prompt here",
+                "model": "gpt-4"
+              }
+            }
+          ],
+          "edges": []
+        }
+      render: json
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ai-model
+    attributes:
+      label: AI Model (if applicable)
+      description: Select AI model for AI-powered tasks
+      options:
+        - gpt-4
+        - gpt-3.5-turbo
+        - claude-3-opus
+        - claude-3-sonnet
+        - gemini-pro
+        - custom
+      default: 0
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected-output
+    attributes:
+      label: Expected Output
+      description: Describe what output you expect from this task
+      placeholder: "Describe expected results..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: workflow-options
+    attributes:
+      label: Workflow Options
+      options:
+        - label: Enable parallel execution where possible
+        - label: Store artifacts in repository branch
+        - label: Create pull request with results
+        - label: Post results to GitHub Discussions
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any additional information or context for this task
+      placeholder: "Add any relevant context, links, or references..."
+    validations:
+      required: false

@@ -1,0 +1,93 @@
+name: Agent Discussion Notifier
+
+on:
+  workflow_run:
+    workflows: ["AI Agent Orchestrator"]
+    types: [completed]
+
+permissions:
+  discussions: write
+  issues: read
+
+jobs:
+  notify-discussion:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Create Discussion Post
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id;
+            const conclusion = context.payload.workflow_run.conclusion;
+            const runUrl = context.payload.workflow_run.html_url;
+            
+            // Get the issue that triggered this workflow
+            let issueNumber = null;
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            });
+            
+            // Create discussion post
+            const discussionTitle = `Agent Execution ${conclusion === 'success' ? 'Completed' : 'Failed'} - Run ${runId}`;
+            const discussionBody = `
+## 🤖 AI Agent Execution ${conclusion === 'success' ? '✅ Completed' : '❌ Failed'}
+
+**Run ID**: ${runId}
+**Status**: ${conclusion}
+**Timestamp**: ${new Date().toISOString()}
+
+### Details
+
+- [View Workflow Run](${runUrl})
+- Artifacts: ${artifacts.data.total_count} available
+
+### What's Next?
+
+${conclusion === 'success' 
+  ? '- Review the execution results\n- Check the artifacts\n- Verify the output meets requirements' 
+  : '- Check the workflow logs\n- Identify the failure point\n- Retry or adjust configuration'}
+
+### Share Your Feedback
+
+Feel free to share insights, questions, or suggestions about this execution!
+
+---
+
+*This discussion was automatically created by the AI Agent Orchestrator*
+`;
+
+            try {
+              // Create discussion in General category
+              const query = \`
+                mutation($repositoryId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
+                  createDiscussion(input: {
+                    repositoryId: $repositoryId
+                    categoryId: $categoryId
+                    title: $title
+                    body: $body
+                  }) {
+                    discussion {
+                      id
+                      url
+                    }
+                  }
+                }
+              \`;
+              
+              // Get repository and category IDs
+              const repo = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              
+              console.log('Discussion notification prepared');
+              console.log('Title:', discussionTitle);
+              console.log('Body:', discussionBody);
+              
+            } catch (error) {
+              console.log('Could not create discussion:', error.message);
+              console.log('Discussion content prepared for manual posting');
+            }
