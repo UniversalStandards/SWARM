@@ -1,0 +1,134 @@
+name: GitHub Copilot Integration
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  copilot-assist:
+    runs-on: ubuntu-latest
+    if: |
+      contains(github.event.issue.labels.*.name, 'copilot-assist') ||
+      (github.event.comment && contains(github.event.comment.body, '@copilot'))
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Parse Copilot Request
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let requestText = '';
+            let issueNumber = null;
+            
+            if (context.eventName === 'issues') {
+              requestText = context.payload.issue.body;
+              issueNumber = context.payload.issue.number;
+            } else if (context.eventName === 'issue_comment') {
+              requestText = context.payload.comment.body;
+              issueNumber = context.payload.issue.number;
+              
+              // Remove @copilot mention
+              requestText = requestText.replace(/@copilot\s*/gi, '').trim();
+            }
+            
+            core.setOutput('request', requestText);
+            core.setOutput('issue_number', issueNumber);
+            
+            return { requestText, issueNumber };
+      
+      - name: Generate Copilot Response
+        id: copilot
+        uses: actions/github-script@v7
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          script: |
+            const request = \`${{ steps.parse.outputs.request }}\`;
+            
+            // Generate workflow suggestion using AI
+            const systemPrompt = \`You are GitHub Copilot integrated with the AI Agent Swarm Orchestrator.
+            
+Your role is to help users create effective multi-agent workflows. When users describe what they want to accomplish:
+
+1. Analyze their requirements
+2. Suggest the best agent types and workflow structure
+3. Generate complete JSON configuration
+4. Provide explanations and best practices
+5. Recommend AI models based on the task
+
+Respond in a helpful, clear manner with actionable JSON configurations.\`;
+            
+            const userPrompt = \`Help me create a workflow for: ${request}
+            
+Generate:
+1. A brief analysis of the requirements
+2. Recommended agent types and workflow structure
+3. Complete JSON configuration ready to use
+4. Tips for optimal execution\`;
+            
+            // Simulate AI response (in production, this would call OpenAI API)
+            const response = {
+              analysis: "Based on your requirements, I recommend a multi-stage workflow with data processing and AI analysis.",
+              workflow: {
+                nodes: [
+                  {
+                    id: "suggested-node-1",
+                    type: "agent",
+                    config: {
+                      agentType: "worker",
+                      task: "Process input data"
+                    }
+                  }
+                ],
+                edges: []
+              },
+              tips: [
+                "Use parallel execution for independent tasks",
+                "Add validation steps between stages",
+                "Store intermediate results for debugging"
+              ]
+            };
+            
+            const responseMarkdown = \`## 🤖 GitHub Copilot Suggestions
+
+### Analysis
+${response.analysis}
+
+### Recommended Workflow Configuration
+
+\`\`\`json
+${JSON.stringify(response.workflow, null, 2)}
+\`\`\`
+
+### 💡 Tips for Success
+${response.tips.map((tip, i) => \`${i + 1}. ${tip}\`).join('\n')}
+
+### Next Steps
+1. Copy the JSON configuration above
+2. Create a new issue with the "🤖 Agent Task" template
+3. Paste the configuration into the task configuration field
+4. Submit the issue to start execution
+
+---
+*Powered by GitHub Copilot × AI Agent Orchestrator*\`;
+            
+            const issueNumber = '${{ steps.parse.outputs.issue_number }}';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(issueNumber),
+              body: responseMarkdown
+            });
+            
+            console.log('Copilot response posted');
