@@ -45,7 +45,11 @@
             
             # Detect React/Vite
             if [ -f "package.json" ]; then
-              if grep -q "vite" package.json; then
+              if grep -q "next" package.json; then
+                PROJECT_TYPE="nextjs"
+                BUILD_DIR="out"
+                echo "✅ Detected: Next.js (AI Swarm Orchestrator)"
+              elif grep -q "vite" package.json; then
                 PROJECT_TYPE="vite"
                 BUILD_DIR="dist"
                 echo "✅ Detected: Vite project"
@@ -53,10 +57,6 @@
                 PROJECT_TYPE="react"
                 BUILD_DIR="build"
                 echo "✅ Detected: Create React App"
-              elif grep -q "next" package.json; then
-                PROJECT_TYPE="nextjs"
-                BUILD_DIR="out"
-                echo "✅ Detected: Next.js"
               elif grep -q "gatsby" package.json; then
                 PROJECT_TYPE="gatsby"
                 BUILD_DIR="public"
@@ -244,8 +244,16 @@
                 npm run build
                 ;;
               nextjs)
-                npm run build
-                npm run export || echo "Using static export"
+                echo "Building Next.js app for static export..."
+                EXPORT_MODE=static npm run build || npm run export || echo "Using static export"
+                
+                # Create .nojekyll to prevent GitHub Pages from ignoring _next directory
+                touch out/.nojekyll 2>/dev/null || touch dist/.nojekyll 2>/dev/null || true
+                
+                # Add base path configuration if needed
+                if [ ! -f "out/index.html" ] && [ -f "dist/index.html" ]; then
+                  BUILD_DIR="dist"
+                fi
                 ;;
               gatsby)
                 npm run build

@@ -2,12 +2,32 @@
 
 ## Overview
 
-This repository now contains **two implementations** of the AI Swarm Orchestrator:
+This repository contains a **complete AI Swarm Orchestrator** with **two ways to interact**:
 
-1. **Original Next.js Application** - Web-based UI with full-stack functionality
-2. **GitHub-Native System** - Runs entirely on GitHub infrastructure (NEW! ✨)
+1. **Robust Next.js GUI** - Enterprise-grade visual interface (Accessible via GitHub Pages! 🎨)
+2. **GitHub-Native System** - Runs entirely on GitHub infrastructure (Issues, Actions, Projects)
 
-Both systems can coexist and complement each other, providing flexibility in how you orchestrate AI agents.
+Both systems work together seamlessly, providing flexibility in how you orchestrate AI agents.
+
+## 🎨 GUI via GitHub Pages
+
+**YES!** The orchestrator includes a **beautiful, professional GUI** that can be accessed via **GitHub Pages** for FREE!
+
+**Access it at:**
+```
+https://YOUR-USERNAME.github.io/SWARM/
+```
+
+**Features:**
+- ✅ Drag-and-drop workflow designer
+- ✅ Real-time monitoring dashboard
+- ✅ Visual agent management
+- ✅ GitHub integration
+- ✅ API key configuration
+- ✅ Execution history viewer
+- ✅ Dark mode with modern animations
+
+**See [GUI-GITHUB-PAGES-GUIDE.md](GUI-GITHUB-PAGES-GUIDE.md) for complete setup and usage!**
 
 ## 📁 Repository Structure
 
@@ -46,14 +66,23 @@ SWARM/
 
 ## 🎯 Choosing the Right Implementation
 
-### Use the Next.js Application When:
+### Use the GUI (via GitHub Pages) When:
 
-- ✅ You want a graphical user interface
-- ✅ You need custom visualization and monitoring dashboards
-- ✅ You prefer traditional web application deployment
-- ✅ You want to customize the UI extensively
-- ✅ You need to integrate with external authentication providers
-- ✅ You want to self-host the application
+- ✅ You want a beautiful graphical user interface
+- ✅ You need drag-and-drop workflow building
+- ✅ You prefer visual monitoring dashboards
+- ✅ You want to design workflows interactively
+- ✅ You need team collaboration on design
+- ✅ You want zero-setup hosting (free on GitHub Pages!)
+
+### Use the Next.js Application (Self-Hosted) When:
+
+- ✅ You need custom authentication
+- ✅ You want to extend the UI extensively
+- ✅ You need server-side features
+- ✅ You want to integrate with internal systems
+- ✅ You prefer self-hosted deployment
+- ✅ You need custom API endpoints
 
 ### Use the GitHub-Native System When:
 
