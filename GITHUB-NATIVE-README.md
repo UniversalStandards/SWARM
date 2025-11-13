@@ -21,11 +21,14 @@ This is a **GitHub-native** implementation of the AI Agent Swarm Orchestrator th
 - ✅ Parallel and sequential execution
 - ✅ AI-powered task execution (OpenAI, Anthropic, Google)
 - ✅ Automatic issue-based task management
+- ✅ **Hierarchical project structures with automatic sub-projects** 🆕
+- ✅ **Intelligent subtasking and delegation** 🆕
 - ✅ Real-time status tracking via labels and comments
 - ✅ Artifact storage in execution branches
 - ✅ Comprehensive logging and monitoring
 - ✅ Pull request generation for results
-- ✅ GitHub Projects integration for visualization
+- ✅ GitHub Projects integration with Kanban boards
+- ✅ **Manager/Orchestrator agents can create sub-projects automatically** 🆕
 
 ## 🏗️ Architecture
 
@@ -273,6 +276,58 @@ Results are stored in branches:
   - `results.json` - Execution results
   - Generated artifacts and outputs
 
+## 🏗️ Hierarchical Workflows & Sub-Projects
+
+### Automatic Project Hierarchies
+
+The orchestrator now automatically creates hierarchical project structures for complex workflows:
+
+**When a Manager or Orchestrator agent is used**, the system automatically:
+1. Creates a dedicated sub-project
+2. Delegates sub-tasks to that project
+3. Tracks progress in Kanban boards
+4. Aggregates results back to parent
+
+**Example: Manager Agent with Sub-Tasks**
+
+```json
+{
+  "id": "process-manager",
+  "type": "agent",
+  "config": {
+    "agentType": "manager",
+    "task": "Coordinate data processing",
+    "subTasks": [
+      { "task": "Normalize data", "agent": "data-processor" },
+      { "task": "Validate schema", "agent": "data-processor" },
+      { "task": "Enrich metadata", "agent": "data-processor" }
+    ]
+  }
+}
+```
+
+**Result**: A sub-project is created with 3 sub-task issues, each tracked independently!
+
+### Benefits of Hierarchical Projects
+
+- ✅ **Better Organization**: Visual hierarchy in project boards
+- ✅ **Parallel Execution**: Sub-tasks run concurrently
+- ✅ **Scalability**: Handle complex workflows easily
+- ✅ **Transparency**: Clear progress tracking at all levels
+- ✅ **Collaboration**: Team members work on different sub-tasks
+
+### Manual Sub-Project Creation
+
+You can also manually create sub-projects:
+
+```bash
+gh workflow run project-hierarchy.yml \
+  -f parent_issue=123 \
+  -f auto_create_subprojects=true
+```
+
+**📖 See [PROJECT-HIERARCHY-GUIDE.md](PROJECT-HIERARCHY-GUIDE.md) for complete details!**
+
 ## 🔍 Monitoring and Debugging
 
 ### View Execution Logs
@@ -290,6 +345,16 @@ git checkout execution/<run-id>
 
 # View results
 cat .github/executions/<run-id>/results.json
+```
+
+### View Project Hierarchy
+
+```bash
+# List all projects
+gh project list
+
+# View sub-tasks for an issue
+gh issue list --label "parent:123"
 ```
 
 ### Download Artifacts

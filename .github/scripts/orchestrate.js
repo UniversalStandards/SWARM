@@ -174,6 +174,12 @@ async function executeAgentNode(context, node, octokit) {
   // Create a sub-issue for the agent task
   const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
   
+  // Check if this node should create a sub-project
+  const needsSubProject = config.createSubProject || 
+                          agentType === 'manager' || 
+                          agentType === 'orchestrator' ||
+                          (config.subTasks && config.subTasks.length > 0);
+  
   const issue = await octokit.rest.issues.create({
     owner,
     repo,
@@ -181,6 +187,7 @@ async function executeAgentNode(context, node, octokit) {
     body: `**Agent Type**: ${agentType}
 **Parent Run**: ${context.runId}
 **Node ID**: ${node.id}
+${needsSubProject ? '**Sub-Project**: Will be created automatically' : ''}
 
 **Task Configuration**:
 \`\`\`json
@@ -188,17 +195,103 @@ ${JSON.stringify(config, null, 2)}
 \`\`\`
 
 This issue was automatically created by the AI Agent Orchestrator.`,
-    labels: ['agent-task', `agent:${agentType}`, 'auto-created']
+    labels: ['agent-task', `agent:${agentType}`, 'auto-created', ...(needsSubProject ? ['needs-subproject'] : [])]
   });
   
   log(context, 'info', `Created agent task issue #${issue.data.number}`);
+  
+  // If this is a manager/orchestrator or has subtasks, create sub-project
+  if (needsSubProject) {
+    await createSubProjectForAgent(context, node, issue.data, octokit);
+  }
   
   // Simulate agent execution (in real implementation, this would trigger worker workflow)
   context.artifacts.push({
     name: `agent-${node.id}-output`,
     url: issue.data.html_url,
-    type: 'issue'
+    type: 'issue',
+    hasSubProject: needsSubProject
   });
+}
+
+// Create sub-project for complex agent tasks
+async function createSubProjectForAgent(context, node, issue, octokit) {
+  const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+  const { config } = node;
+  
+  log(context, 'info', `Creating sub-project for agent ${node.id}`);
+  
+  try {
+    // Create dedicated project for this agent's work
+    const projectName = `Agent ${node.id}: ${config.task || 'Sub-Project'}`;
+    const { data: project } = await octokit.rest.projects.createForRepo({
+      owner,
+      repo,
+      name: projectName,
+      body: `Sub-project for agent task from issue #${issue.number}
+      
+**Parent Workflow Run**: ${context.runId}
+**Agent Type**: ${config.agentType}
+**Node ID**: ${node.id}
+
+This project tracks all sub-tasks delegated by the ${config.agentType} agent.`
+    });
+    
+    // Create columns
+    const columns = ['To Do', 'In Progress', 'Done'];
+    for (const colName of columns) {
+      await octokit.rest.projects.createColumn({
+        project_id: project.id,
+        name: colName
+      });
+    }
+    
+    // Create sub-tasks if defined
+    if (config.subTasks && config.subTasks.length > 0) {
+      for (const subTask of config.subTasks) {
+        const { data: subIssue } = await octokit.rest.issues.create({
+          owner,
+          repo,
+          title: `[Sub-Task] ${subTask.name || subTask.task}`,
+          body: `**Parent Agent**: #${issue.number}
+**Sub-Project**: [${projectName}](${project.html_url})
+
+**Task**: ${subTask.task || subTask.description || 'Execute sub-task'}
+
+\`\`\`json
+${JSON.stringify(subTask, null, 2)}
+\`\`\``,
+          labels: ['agent-subtask', `parent:${issue.number}`]
+        });
+        
+        log(context, 'info', `Created sub-task issue #${subIssue.number}`);
+      }
+    }
+    
+    // Comment on parent issue with project link
+    await octokit.rest.issues.createComment({
+      owner,
+      repo,
+      issue_number: issue.number,
+      body: `🏗️ **Sub-Project Created**
+
+A dedicated project has been created to track this agent's work:
+
+**Project**: [${projectName}](${project.html_url})
+
+The agent will delegate sub-tasks to this project for organized tracking and execution.`
+    });
+    
+    context.artifacts.push({
+      name: `subproject-${node.id}`,
+      url: project.html_url,
+      type: 'project',
+      issueNumber: issue.number
+    });
+    
+  } catch (error) {
+    log(context, 'warn', `Could not create sub-project: ${error.message}`);
+  }
 }
 
 // Execute condition node
