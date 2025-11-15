@@ -201,19 +201,44 @@ Configure everything:
 
 ### Environment Variables
 
-For GitHub Pages deployment, configure in repository secrets:
+#### ⚠️ Security Note: GitHub Pages Limitations
 
+**IMPORTANT**: GitHub Pages serves static files only. You **CANNOT** securely use API keys with GitHub Pages deployment because:
+- There is no backend server to protect secrets
+- All environment variables with `NEXT_PUBLIC_` prefix are embedded in the client-side JavaScript bundle
+- Anyone can inspect the browser code and extract your API keys
+
+#### Secure Configuration Options
+
+**Option 1: For Development/Testing Only (Local)**
 ```bash
-# Required for full functionality
-NEXT_PUBLIC_GITHUB_TOKEN=your_token_here
-NEXT_PUBLIC_OPENAI_API_KEY=your_key_here
-NEXT_PUBLIC_ANTHROPIC_API_KEY=your_key_here
-NEXT_PUBLIC_GOOGLE_AI_API_KEY=your_key_here
-
-# Optional
-NEXT_PUBLIC_BASE_PATH=/SWARM  # If repo name is not at root
-NEXT_PUBLIC_API_URL=https://api.yourservice.com
+# These keys should NEVER be exposed publicly
+# Use these ONLY for local development with `npm run dev`
+OPENAI_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
+GOOGLE_AI_API_KEY=your_key_here
+GITHUB_TOKEN=your_token_here
 ```
+
+**Option 2: For Production with Backend API (Recommended)**
+
+Deploy to a platform with backend support (Vercel, AWS, etc.) and use API routes:
+1. Store sensitive keys as server-side environment variables (without `NEXT_PUBLIC_` prefix)
+2. Create API proxy routes in `app/api/` that call AI services
+3. Frontend makes requests to your API routes, not directly to AI providers
+
+**Option 3: GitHub Pages (Static Only - Limited Functionality)**
+```bash
+# Only non-sensitive configuration for GitHub Pages
+NEXT_PUBLIC_BASE_PATH=/SWARM  # If repo name is not at root
+NEXT_PUBLIC_ENABLE_AI_ASSISTANT=false  # Disable features requiring API keys
+NEXT_PUBLIC_API_URL=https://your-backend-api.com  # Link to separate backend
+```
+
+For GitHub Pages, sensitive operations must be handled by:
+- A separate backend service you control
+- Serverless functions (AWS Lambda, Cloudflare Workers, etc.)
+- GitHub Actions workflows (for automated tasks)
 
 ### Base Path Configuration
 
@@ -364,29 +389,76 @@ https://YOUR-USERNAME.github.io/SWARM/
 
 ## 🔒 Security
 
-### API Keys
+### ⚠️ CRITICAL: API Key Security
 
-**Never commit API keys to repository!**
+**Never expose API keys in client-side code!**
 
-Use repository secrets:
+#### ❌ UNSAFE - DO NOT DO THIS:
 ```bash
+# These expose your keys publicly in the browser bundle
+NEXT_PUBLIC_OPENAI_API_KEY=sk-...     # ❌ NEVER USE
+NEXT_PUBLIC_ANTHROPIC_API_KEY=sk-...  # ❌ NEVER USE
+NEXT_PUBLIC_GITHUB_TOKEN=ghp_...      # ❌ NEVER USE
+```
+
+Anyone visiting your site can:
+- Open browser DevTools
+- View your compiled JavaScript
+- Extract and steal your API keys
+- Use your keys to make API calls at your expense
+
+#### ✅ SAFE - Backend Only:
+```bash
+# Server-side only (not accessible in browser)
+OPENAI_API_KEY=sk-...      # ✅ Safe - backend only
+ANTHROPIC_API_KEY=sk-...   # ✅ Safe - backend only
+GITHUB_TOKEN=ghp_...       # ✅ Safe - backend only
+```
+
+### GitHub Pages Deployment Considerations
+
+GitHub Pages is a **static file host** with no backend:
+- ❌ Cannot securely store API keys
+- ❌ Cannot make authenticated API calls server-side
+- ❌ All JavaScript runs in the browser
+- ✅ Good for public, non-sensitive content
+- ✅ Can connect to a separate backend API
+
+### Secure Production Deployment
+
+For production with AI features, use platforms with backend support:
+
+1. **Vercel/Netlify** (Recommended)
+   - Deploy the full Next.js app
+   - Store API keys as environment variables
+   - Use Next.js API routes as secure proxies
+
+2. **AWS/GCP/Azure**
+   - Deploy with EC2, App Engine, or Azure App Service
+   - Keep API keys in secrets manager
+   - Use serverless functions for API calls
+
+3. **Hybrid Approach**
+   - Host static UI on GitHub Pages
+   - Deploy separate backend API
+   - Configure `NEXT_PUBLIC_API_URL` to point to your backend
+
+### Repository Secrets
+
+GitHub repository secrets are for **GitHub Actions workflows**, not for static websites:
+
+```bash
+# These are for CI/CD workflows, not client-side code
 gh secret set OPENAI_API_KEY -b"your-key-here"
 ```
 
-### GitHub Token
+### CORS and Client-Side Security
 
-The GUI can work with:
-- Public API (limited features)
-- GitHub token (full features)
-- GitHub OAuth (best experience)
-
-### CORS
-
-GitHub Pages serves static files, so:
-- No server-side secrets exposure
-- All API calls from browser
-- Use environment variables
-- Implement client-side auth
+When using GitHub Pages:
+- All code runs in the user's browser
+- No server-side execution
+- Cannot hide sensitive credentials
+- Use for demos and public tools only
 
 ## 🐛 Troubleshooting
 
