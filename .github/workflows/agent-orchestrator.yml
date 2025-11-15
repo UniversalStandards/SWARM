@@ -1,0 +1,226 @@
+name: AI Agent Orchestrator
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      workflow_id:
+        description: 'Workflow ID to execute'
+        required: true
+      input_data:
+        description: 'Input data (JSON format)'
+        required: false
+        default: '{}'
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
+  discussions: write
+  projects: write
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'agent-task')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.issue.labels.*.name, 'agent-task')) ||
+      github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Parse Agent Task
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let taskData = {};
+            
+            if (context.eventName === 'workflow_dispatch') {
+              taskData = {
+                workflowId: context.payload.inputs.workflow_id,
+                inputData: JSON.parse(context.payload.inputs.input_data || '{}'),
+                issueNumber: null
+              };
+            } else if (context.eventName === 'issues' || context.eventName === 'issue_comment') {
+              const issue = context.payload.issue;
+              const issueBody = issue.body || '';
+              
+              // Parse task configuration from issue body
+              const taskMatch = issueBody.match(/```json\n([\s\S]*?)\n```/);
+              if (taskMatch) {
+                taskData = JSON.parse(taskMatch[1]);
+              }
+              
+              taskData.issueNumber = issue.number;
+              taskData.issueTitle = issue.title;
+              taskData.labels = issue.labels.map(l => l.name);
+            }
+            
+            core.setOutput('task_data', JSON.stringify(taskData));
+            core.setOutput('issue_number', taskData.issueNumber || '');
+            
+            return taskData;
+      
+      - name: Update Issue Status
+        if: steps.parse.outputs.issue_number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = ${{ steps.parse.outputs.issue_number }};
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['status:running', 'orchestrator:active']
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `🤖 **Agent Orchestrator Started**
+              
+              - **Run ID**: ${{ github.run_id }}
+              - **Started**: ${new Date().toISOString()}
+              - **Status**: Processing
+              
+              [View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            });
+      
+      - name: Execute Agent Workflow
+        id: execute
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        run: |
+          # Create execution directory
+          mkdir -p .github/executions/${{ github.run_id }}
+          
+          # Save task data
+          echo '${{ steps.parse.outputs.task_data }}' > .github/executions/${{ github.run_id }}/task.json
+          
+          # Execute the orchestration script
+          node .github/scripts/orchestrate.js \
+            --task-file .github/executions/${{ github.run_id }}/task.json \
+            --output-dir .github/executions/${{ github.run_id }} \
+            --run-id ${{ github.run_id }}
+      
+      - name: Store Execution Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-${{ github.run_id }}
+          path: .github/executions/${{ github.run_id }}/
+          retention-days: 30
+      
+      - name: Create Result Branch
+        if: success()
+        run: |
+          BRANCH_NAME="execution/${{ github.run_id }}"
+          
+          git config user.name "AI Agent Orchestrator"
+          git config user.email "actions@github.com"
+          
+          git checkout -b "$BRANCH_NAME"
+          git add .github/executions/${{ github.run_id }}/
+          git commit -m "Agent execution results for run ${{ github.run_id }}" || true
+          git push origin "$BRANCH_NAME" || true
+      
+      - name: Update Issue with Results
+        if: always() && steps.parse.outputs.issue_number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issueNumber = ${{ steps.parse.outputs.issue_number }};
+            const runId = '${{ github.run_id }}';
+            const success = '${{ steps.execute.outcome }}' === 'success';
+            
+            // Read execution results
+            let resultsData = {};
+            try {
+              const resultsPath = `.github/executions/${runId}/results.json`;
+              if (fs.existsSync(resultsPath)) {
+                resultsData = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+              }
+            } catch (error) {
+              console.log('Could not read results:', error.message);
+            }
+            
+            const statusLabel = success ? 'status:completed' : 'status:failed';
+            const statusEmoji = success ? '✅' : '❌';
+            
+            // Update labels
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              name: 'status:running'
+            }).catch(() => {});
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: [statusLabel]
+            });
+            
+            // Create comment with results
+            const resultsMarkdown = `${statusEmoji} **Agent Execution ${success ? 'Completed' : 'Failed'}**
+            
+            - **Run ID**: ${runId}
+            - **Completed**: ${new Date().toISOString()}
+            - **Status**: ${success ? 'Success' : 'Failed'}
+            - **Results Branch**: \`execution/${runId}\`
+            
+            ${resultsData.summary || 'No summary available'}
+            
+            ### Artifacts
+            
+            ${resultsData.artifacts ? resultsData.artifacts.map(a => `- [${a.name}](${a.url})`).join('\n') : 'No artifacts generated'}
+            
+            ### Logs
+            
+            \`\`\`
+            ${resultsData.logs ? resultsData.logs.slice(-10).join('\n') : 'No logs available'}
+            \`\`\`
+            
+            [View Full Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${runId})
+            [View Results Branch](https://github.com/${{ github.repository }}/tree/execution/${runId})`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: resultsMarkdown
+            });
+            
+            // Close issue if successful
+            if (success) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                state: 'closed'
+              });
+            }

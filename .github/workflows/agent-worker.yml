@@ -1,0 +1,105 @@
+name: AI Agent Worker
+
+on:
+  workflow_call:
+    inputs:
+      agent_type:
+        required: true
+        type: string
+      task_data:
+        required: true
+        type: string
+      parent_issue:
+        required: false
+        type: string
+    secrets:
+      OPENAI_API_KEY:
+        required: false
+      ANTHROPIC_API_KEY:
+        required: false
+      GOOGLE_AI_API_KEY:
+        required: false
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Execute Agent Task
+        id: execute
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+          AGENT_TYPE: ${{ inputs.agent_type }}
+          TASK_DATA: ${{ inputs.task_data }}
+        run: |
+          mkdir -p .github/executions/${{ github.run_id }}
+          
+          echo "Executing agent type: $AGENT_TYPE"
+          echo "$TASK_DATA" > .github/executions/${{ github.run_id }}/task.json
+          
+          node .github/scripts/agent-executor.js \
+            --agent-type "$AGENT_TYPE" \
+            --task-file .github/executions/${{ github.run_id }}/task.json \
+            --output-dir .github/executions/${{ github.run_id }}
+      
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-results-${{ github.run_id }}
+          path: .github/executions/${{ github.run_id }}/
+          retention-days: 30
+      
+      - name: Report Back to Parent
+        if: inputs.parent_issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const parentIssue = '${{ inputs.parent_issue }}';
+            const runId = '${{ github.run_id }}';
+            
+            let results = {};
+            try {
+              const resultsPath = `.github/executions/${runId}/results.json`;
+              if (fs.existsSync(resultsPath)) {
+                results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+              }
+            } catch (error) {
+              console.log('Could not read results:', error.message);
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(parentIssue),
+              body: `🤖 **Agent Worker Completed**
+              
+              - **Agent Type**: ${{ inputs.agent_type }}
+              - **Run ID**: ${runId}
+              - **Status**: ${results.success ? '✅ Success' : '❌ Failed'}
+              
+              ${results.output || 'No output available'}
+              
+              [View Worker Run](https://github.com/${{ github.repository }}/actions/runs/${runId})`
+            });

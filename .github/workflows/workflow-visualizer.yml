@@ -1,0 +1,129 @@
+name: Workflow Visualizer
+
+on:
+  issues:
+    types: [opened, labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to visualize'
+        required: true
+
+permissions:
+  issues: write
+  contents: write
+
+jobs:
+  visualize:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'agent-task')) ||
+      github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli
+      
+      - name: Generate Workflow Diagram
+        id: generate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issueNumber = context.payload.issue?.number || '${{ github.event.inputs.issue_number }}';
+            
+            // Get issue
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(issueNumber)
+            });
+            
+            // Parse workflow from issue body
+            const issueBody = issue.body || '';
+            const jsonMatch = issueBody.match(/```json\n([\s\S]*?)\n```/);
+            
+            if (!jsonMatch) {
+              console.log('No workflow configuration found');
+              return;
+            }
+            
+            const workflow = JSON.parse(jsonMatch[1]);
+            const nodes = workflow.nodes || [];
+            const edges = workflow.edges || [];
+            
+            // Generate Mermaid diagram
+            let mermaid = 'graph TD\n';
+            
+            // Add nodes
+            nodes.forEach(node => {
+              const label = `${node.id}<br/>${node.type}`;
+              const shape = getNodeShape(node.type);
+              mermaid += `    ${node.id}${shape[0]}${label}${shape[1]}\n`;
+            });
+            
+            // Add edges
+            edges.forEach(edge => {
+              mermaid += `    ${edge.from} --> ${edge.to}\n`;
+            });
+            
+            // Add styling
+            mermaid += '\n    classDef agent fill:#e1f5ff,stroke:#01579b\n';
+            mermaid += '    classDef ai fill:#f3e5f5,stroke:#4a148c\n';
+            mermaid += '    classDef github fill:#e8f5e9,stroke:#1b5e20\n';
+            mermaid += '    classDef condition fill:#fff3e0,stroke:#e65100\n';
+            
+            nodes.forEach(node => {
+              if (node.type === 'agent') mermaid += `    class ${node.id} agent\n`;
+              if (node.type === 'ai-task') mermaid += `    class ${node.id} ai\n`;
+              if (node.type === 'github-action') mermaid += `    class ${node.id} github\n`;
+              if (node.type === 'condition') mermaid += `    class ${node.id} condition\n`;
+            });
+            
+            function getNodeShape(type) {
+              switch (type) {
+                case 'agent': return ['[', ']'];
+                case 'ai-task': return ['([', '])'];
+                case 'condition': return ['{', '}'];
+                case 'parallel': return ['[[', ']]'];
+                case 'github-action': return ['[(', ')]'];
+                default: return ['(', ')'];
+              }
+            }
+            
+            // Save diagram
+            fs.writeFileSync('workflow-diagram.mmd', mermaid);
+            
+            // Create diagram as comment
+            const diagramComment = \`## 🎨 Workflow Visualization
+            
+\`\`\`mermaid
+${mermaid}
+\`\`\`
+
+### Legend
+- 📦 **Rectangle**: Agent Task
+- 🧠 **Stadium**: AI Task
+- ⚙️ **Diamond**: Condition
+- 🔄 **Double Rectangle**: Parallel Execution
+- 🐙 **Cylinder**: GitHub Action
+
+[Mermaid Live Editor](https://mermaid.live/edit#pako:${Buffer.from(mermaid).toString('base64')})\`;
+            
+            // Add comment to issue
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(issueNumber),
+              body: diagramComment
+            });
+            
+            console.log('Workflow diagram generated and posted');
