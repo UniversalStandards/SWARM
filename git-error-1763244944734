@@ -1,0 +1,5 @@
+> git add -A -- package-lock.json
+error: unable to create temporary file: No space left on device
+error: package-lock.json: failed to insert into database
+error: unable to index file 'package-lock.json'
+fatal: updating files failed
