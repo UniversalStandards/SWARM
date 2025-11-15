@@ -1,0 +1,131 @@
+name: Sync Issues to Projects
+
+on:
+  issues:
+    types: [opened, labeled, closed, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  projects: write
+
+jobs:
+  sync-to-project:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'agent-task')
+    
+    steps:
+      - name: Add to Project Board
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            
+            // Extract metadata from issue
+            const labels = issue.labels.map(l => l.name);
+            const agentType = labels.find(l => l.startsWith('agent:'))?.replace('agent:', '') || 'unknown';
+            const status = labels.find(l => l.startsWith('status:'))?.replace('status:', '') || 'pending';
+            const priority = issue.body?.match(/Priority:\s*(\w+)/)?.[1] || 'medium';
+            
+            // Find or create project
+            const projects = await github.rest.projects.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            
+            let project = projects.data.find(p => p.name === 'AI Agent Orchestration');
+            
+            if (!project) {
+              // Create project if it doesn't exist
+              const newProject = await github.rest.projects.createForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'AI Agent Orchestration',
+                body: 'Track AI agent tasks and workflows'
+              });
+              project = newProject.data;
+            }
+            
+            // Get or create columns
+            const columns = await github.rest.projects.listColumns({
+              project_id: project.id
+            });
+            
+            const columnNames = ['Pending', 'Running', 'Completed', 'Failed'];
+            const projectColumns = {};
+            
+            for (const colName of columnNames) {
+              let column = columns.data.find(c => c.name === colName);
+              if (!column) {
+                const newColumn = await github.rest.projects.createColumn({
+                  project_id: project.id,
+                  name: colName
+                });
+                column = newColumn.data;
+              }
+              projectColumns[colName.toLowerCase()] = column.id;
+            }
+            
+            // Determine target column based on status
+            const statusMapping = {
+              'pending': 'Pending',
+              'running': 'Running',
+              'completed': 'Completed',
+              'failed': 'Failed'
+            };
+            
+            const targetColumn = statusMapping[status] || 'Pending';
+            const columnId = projectColumns[targetColumn.toLowerCase()];
+            
+            // Check if card already exists
+            let existingCard = null;
+            for (const colName of Object.keys(projectColumns)) {
+              const cards = await github.rest.projects.listCards({
+                column_id: projectColumns[colName]
+              });
+              
+              existingCard = cards.data.find(card => 
+                card.content_url?.includes(`/issues/${issue.number}`)
+              );
+              
+              if (existingCard) break;
+            }
+            
+            if (existingCard) {
+              // Move existing card to correct column
+              await github.rest.projects.moveCard({
+                card_id: existingCard.id,
+                position: 'top',
+                column_id: columnId
+              });
+              
+              console.log(`Moved card #${issue.number} to ${targetColumn}`);
+            } else {
+              // Create new card
+              await github.rest.projects.createCard({
+                column_id: columnId,
+                content_id: issue.id,
+                content_type: 'Issue'
+              });
+              
+              console.log(`Added issue #${issue.number} to ${targetColumn}`);
+            }
+            
+            // Add comment with project link
+            if (context.payload.action === 'labeled' && 
+                context.payload.label?.name === 'agent-task') {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `📊 This task has been added to the [AI Agent Orchestration Project](${project.html_url})
+                
+**Status**: ${targetColumn}
+**Agent Type**: ${agentType}
+**Priority**: ${priority}
+
+Track progress on the project board!`
+              });
+            }

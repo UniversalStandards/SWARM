@@ -1,0 +1,264 @@
+name: Demo Workflow Showcase
+
+on:
+  workflow_dispatch:
+    inputs:
+      demo_type:
+        description: 'Demo type to run'
+        required: true
+        type: choice
+        options:
+          - simple-ai-task
+          - data-pipeline
+          - parallel-execution
+          - code-generation
+          - all-demos
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  run-demo:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create Demo Issue
+        id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const demoType = '${{ github.event.inputs.demo_type }}';
+            
+            // Load demo configuration
+            let config = {};
+            let title = '';
+            let description = '';
+            
+            switch (demoType) {
+              case 'simple-ai-task':
+                config = JSON.parse(fs.readFileSync('examples/workflows/simple-ai-task.json', 'utf8'));
+                title = '🎯 Demo: Simple AI Task';
+                description = 'Demonstrates a simple AI-powered sentiment analysis task';
+                break;
+              
+              case 'data-pipeline':
+                config = JSON.parse(fs.readFileSync('examples/workflows/data-pipeline.json', 'utf8'));
+                title = '🔄 Demo: Data Processing Pipeline';
+                description = 'Demonstrates multi-stage data processing with AI analysis';
+                break;
+              
+              case 'parallel-execution':
+                title = '⚡ Demo: Parallel Execution';
+                description = 'Demonstrates concurrent execution of multiple AI tasks';
+                config = {
+                  nodes: [
+                    {
+                      id: "parallel-demo",
+                      type: "parallel",
+                      config: {
+                        tasks: [
+                          {
+                            type: "ai-task",
+                            id: "task1",
+                            config: {
+                              prompt: "Analyze sentiment: The product is amazing!",
+                              model: "gpt-4"
+                            }
+                          },
+                          {
+                            type: "ai-task",
+                            id: "task2",
+                            config: {
+                              prompt: "Extract entities: Apple released iPhone 15 in Cupertino",
+                              model: "claude-3-sonnet"
+                            }
+                          },
+                          {
+                            type: "ai-task",
+                            id: "task3",
+                            config: {
+                              prompt: "Summarize: AI is transforming industries",
+                              model: "gemini-pro"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  edges: []
+                };
+                break;
+              
+              case 'code-generation':
+                title = '💻 Demo: Code Generation';
+                description = 'Demonstrates AI-powered code generation workflow';
+                config = {
+                  nodes: [
+                    {
+                      id: "generate",
+                      type: "agent",
+                      config: {
+                        agentType: "code-generator",
+                        language: "javascript",
+                        specification: "Create a function to calculate fibonacci numbers"
+                      }
+                    },
+                    {
+                      id: "review",
+                      type: "ai-task",
+                      config: {
+                        prompt: "Review the generated fibonacci function for correctness and efficiency",
+                        model: "gpt-4"
+                      }
+                    }
+                  ],
+                  edges: [
+                    { from: "generate", to: "review" }
+                  ]
+                };
+                break;
+              
+              case 'all-demos':
+                title = '🎪 Demo: All Features Showcase';
+                description = 'Comprehensive demo showcasing all orchestrator features';
+                config = {
+                  nodes: [
+                    {
+                      id: "start",
+                      type: "agent",
+                      config: {
+                        agentType: "worker",
+                        task: "Initialize demo"
+                      }
+                    },
+                    {
+                      id: "ai-analysis",
+                      type: "ai-task",
+                      config: {
+                        prompt: "Provide a brief overview of AI orchestration benefits",
+                        model: "gpt-4",
+                        maxTokens: 500
+                      }
+                    },
+                    {
+                      id: "parallel-tasks",
+                      type: "parallel",
+                      config: {
+                        tasks: [
+                          {
+                            type: "agent",
+                            config: { agentType: "data-processor", operation: "validate" }
+                          },
+                          {
+                            type: "agent",
+                            config: { agentType: "code-generator", language: "python" }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      id: "create-summary",
+                      type: "github-action",
+                      config: {
+                        action: "create-issue",
+                        title: "Demo Results Summary",
+                        body: "Automated summary of demo execution",
+                        labels: ["demo", "automated"]
+                      }
+                    }
+                  ],
+                  edges: [
+                    { from: "start", to: "ai-analysis" },
+                    { from: "ai-analysis", to: "parallel-tasks" },
+                    { from: "parallel-tasks", to: "create-summary" }
+                  ]
+                };
+                break;
+            }
+            
+            // Create issue body
+            const issueBody = \`## ${description}
+
+This is an automated demo showcasing the GitHub-Native AI Agent Orchestrator capabilities.
+
+### Demo Configuration
+
+\`\`\`json
+${JSON.stringify(config, null, 2)}
+\`\`\`
+
+### What to Watch
+
+1. **Issue Labels**: Status updates via labels
+2. **Comments**: Real-time execution updates
+3. **Actions Tab**: Detailed workflow execution logs
+4. **Results**: Artifacts and outputs in execution branch
+
+### Expected Behavior
+
+- ✅ Orchestrator starts automatically
+- ✅ Nodes execute in correct order
+- ✅ Results posted as comments
+- ✅ Issue closes on success
+
+---
+
+*This is a demonstration issue created by the Demo Workflow*
+*Created at: ${new Date().toISOString()}*\`;
+            
+            // Create the issue
+            const { data: issue } = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: issueBody,
+              labels: ['agent-task', 'demo', 'automated']
+            });
+            
+            console.log(\`✅ Created demo issue #${issue.number}\`);
+            
+            core.setOutput('issue_number', issue.number);
+            core.setOutput('issue_url', issue.html_url);
+            
+            return { issueNumber: issue.number, issueUrl: issue.html_url };
+      
+      - name: Post Demo Info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = '${{ steps.create.outputs.issue_number }}';
+            const issueUrl = '${{ steps.create.outputs.issue_url }}';
+            
+            const message = \`## 🎬 Demo Started!
+
+**Issue**: [#${issueNumber}](${issueUrl})
+**Type**: ${{ github.event.inputs.demo_type }}
+
+### How to Follow the Demo
+
+1. **View the Issue**: Click the link above
+2. **Watch the Orchestrator**: Go to [Actions Tab](https://github.com/${{ github.repository }}/actions)
+3. **Track Progress**: Issue will update with real-time status
+4. **Review Results**: Check comments and execution artifacts
+
+### What Happens Next
+
+- 🤖 Orchestrator analyzes the workflow
+- 📊 Executes nodes in optimal order
+- 💬 Posts updates as comments
+- ✅ Closes issue on completion
+
+The demo typically completes in 2-5 minutes depending on complexity.
+
+---
+
+*Demo initiated via workflow dispatch*\`;
+            
+            console.log('Demo information posted');
+            console.log(message);

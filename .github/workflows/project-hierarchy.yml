@@ -1,0 +1,226 @@
+name: Project Hierarchy Manager
+
+on:
+  issues:
+    types: [opened, labeled]
+  workflow_dispatch:
+    inputs:
+      parent_issue:
+        description: 'Parent issue number to create sub-projects from'
+        required: true
+      auto_create_subprojects:
+        description: 'Automatically create sub-projects'
+        type: boolean
+        default: true
+
+permissions:
+  issues: write
+  projects: write
+  contents: read
+
+jobs:
+  manage-hierarchy:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'agent-task')) ||
+      github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create Project Hierarchy
+        id: hierarchy
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue || { number: parseInt('${{ github.event.inputs.parent_issue }}') };
+            
+            // Get issue details if from workflow_dispatch
+            let issueData;
+            if (context.eventName === 'workflow_dispatch') {
+              const { data } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number
+              });
+              issueData = data;
+            } else {
+              issueData = issue;
+            }
+            
+            // Parse workflow configuration
+            const issueBody = issueData.body || '';
+            const taskMatch = issueBody.match(/```json\n([\s\S]*?)\n```/);
+            
+            if (!taskMatch) {
+              console.log('No workflow configuration found');
+              return;
+            }
+            
+            const workflow = JSON.parse(taskMatch[1]);
+            const nodes = workflow.nodes || [];
+            
+            // Create main project for this workflow if it doesn't exist
+            const projectName = `Workflow: ${issueData.title.replace('[Agent Task]', '').trim()}`;
+            const projects = await github.rest.projects.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            
+            let mainProject = projects.data.find(p => p.name === projectName);
+            
+            if (!mainProject) {
+              const { data: newProject } = await github.rest.projects.createForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: projectName,
+                body: \`Project for tracking workflow execution from issue #${issueData.number}
+                
+**Parent Issue**: #${issueData.number}
+**Workflow Type**: ${workflow.name || 'Custom Workflow'}
+**Created**: ${new Date().toISOString()}
+
+This project tracks all sub-tasks and execution steps for this workflow.\`
+              });
+              mainProject = newProject;
+              
+              console.log(\`Created main project: ${projectName}\`);
+            }
+            
+            // Create columns for workflow stages
+            const stageColumns = ['Pending', 'In Progress', 'Review', 'Completed', 'Blocked'];
+            const columnMap = {};
+            
+            for (const stageName of stageColumns) {
+              const { data: column } = await github.rest.projects.createColumn({
+                project_id: mainProject.id,
+                name: stageName
+              }).catch(async () => {
+                // Column might already exist, get it
+                const { data: columns } = await github.rest.projects.listColumns({
+                  project_id: mainProject.id
+                });
+                return { data: columns.find(c => c.name === stageName) };
+              });
+              
+              if (column) {
+                columnMap[stageName.toLowerCase().replace(' ', '_')] = column.id;
+              }
+            }
+            
+            // Create sub-issues for each node in the workflow
+            const subIssues = [];
+            
+            for (const node of nodes) {
+              // Determine if this node should have a sub-issue
+              const createSubIssue = node.type === 'agent' || 
+                                      node.type === 'parallel' || 
+                                      (node.config && node.config.complex);
+              
+              if (createSubIssue) {
+                const subIssueBody = \`**Parent Workflow**: #${issueData.number}
+**Node ID**: ${node.id}
+**Node Type**: ${node.type}
+**Project**: [${projectName}](${mainProject.html_url})
+
+### Task Configuration
+
+\`\`\`json
+${JSON.stringify(node.config || {}, null, 2)}
+\`\`\`
+
+### Execution Details
+
+This is a sub-task created by the orchestrator for parallel execution tracking.
+
+**Dependencies**: ${workflow.edges?.filter(e => e.to === node.id).map(e => e.from).join(', ') || 'None'}
+
+---
+
+*Auto-created by Project Hierarchy Manager*\`;
+
+                const { data: subIssue } = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: \`[Sub-Task] ${node.id}: ${node.config?.task || node.type}\`,
+                  body: subIssueBody,
+                  labels: ['agent-subtask', \`node-type:${node.type}\`, \`parent:${issueData.number}\`]
+                });
+                
+                subIssues.push({
+                  nodeId: node.id,
+                  issueNumber: subIssue.number,
+                  issueUrl: subIssue.html_url
+                });
+                
+                // Add card to project
+                await github.rest.projects.createCard({
+                  column_id: columnMap.pending,
+                  content_id: subIssue.id,
+                  content_type: 'Issue'
+                });
+                
+                console.log(\`Created sub-issue #${subIssue.number} for node ${node.id}\`);
+              }
+            }
+            
+            // Create relationships comment on parent issue
+            if (subIssues.length > 0) {
+              const hierarchyComment = \`## 🏗️ Project Hierarchy Created
+
+**Main Project**: [${projectName}](${mainProject.html_url})
+
+### Sub-Tasks Created
+
+${subIssues.map(sub => \`- [#${sub.issueNumber}](${sub.issueUrl}) - Node: ${sub.nodeId}\`).join('\n')}
+
+### Project Structure
+
+\`\`\`
+${issueData.title}
+├── ${projectName}
+${subIssues.map(sub => \`│   ├── Sub-Task #${sub.issueNumber} (${sub.nodeId})\`).join('\n')}
+\`\`\`
+
+The orchestrator will now delegate work to these sub-tasks. Each sub-task can be tracked independently and will report back to this main issue.
+
+**Tip**: View the [Project Board](${mainProject.html_url}) for a visual overview of all tasks.\`;
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueData.number,
+                body: hierarchyComment
+              });
+            }
+            
+            // Store hierarchy info
+            core.setOutput('project_id', mainProject.id);
+            core.setOutput('project_url', mainProject.html_url);
+            core.setOutput('sub_issues', JSON.stringify(subIssues));
+            
+            return {
+              projectId: mainProject.id,
+              projectUrl: mainProject.html_url,
+              subIssues: subIssues
+            };
+      
+      - name: Update Parent Issue with Project Link
+        if: steps.hierarchy.outputs.project_url
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = context.payload.issue?.number || parseInt('${{ github.event.inputs.parent_issue }}');
+            const projectUrl = '${{ steps.hierarchy.outputs.project_url }}';
+            
+            // Add project label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['has-subproject', 'hierarchical-workflow']
+            });
+            
+            console.log(\`Project hierarchy created for issue #${issueNumber}\`);

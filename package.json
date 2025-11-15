@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "export": "next build && next export"
+    "export": "EXPORT_MODE=static next build",
+    "export:serve": "npx serve@latest out"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.17.1",
