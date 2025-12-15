@@ -1,5 +1,10 @@
 version: '3.8'
 
+# Security Note: Sensitive credentials (POSTGRES_PASSWORD, GRAFANA_ADMIN_PASSWORD, 
+# PGADMIN_DEFAULT_PASSWORD) must be set via environment variables and have NO defaults.
+# This is intentional to prevent using insecure hardcoded passwords in production.
+# Configure these in your .env file before running docker-compose up.
+
 networks:
   ai-swarm-network:
     driver: bridge
