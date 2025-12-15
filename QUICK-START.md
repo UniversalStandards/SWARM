@@ -27,9 +27,23 @@ cd SWARM
 ### Step 2: Configure Environment
 
 ```bash
-cp .env.example .env
-# Edit .env and add your API keys
+# Copy the Docker-specific environment template
+cp .env.docker.example .env
+
+# Generate secure passwords (recommended)
+echo "POSTGRES_PASSWORD=$(openssl rand -base64 24)" >> .env
+echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> .env
+echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
+echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 16)" >> .env
+echo "PGADMIN_DEFAULT_PASSWORD=$(openssl rand -base64 16)" >> .env
+
+# Edit .env and add your AI provider API keys
+# OPENAI_API_KEY=your_key_here
+# ANTHROPIC_API_KEY=your_key_here
+# GOOGLE_API_KEY=your_key_here
 ```
+
+**⚠️ Security Note:** Never commit the `.env` file to version control. It contains sensitive credentials.
 
 ### Step 3: Start All Services
 
@@ -135,7 +149,7 @@ Access at http://localhost:3000
 ### Grafana Dashboards
 
 1. Open http://localhost:3001
-2. Login (admin/admin)
+2. Login with username `admin` and the password you set in `GRAFANA_ADMIN_PASSWORD`
 3. Navigate to "AI Swarm Overview" dashboard
 4. View metrics, alerts, and performance data
 
@@ -217,14 +231,15 @@ k6 run tests/performance/load-test.js
 
 ## Security Checklist
 
-- [ ] Change default passwords (PostgreSQL, Grafana, Redis)
-- [ ] Use strong JWT_SECRET and NEXTAUTH_SECRET
+- [x] All credentials externalized to .env file (not in version control)
+- [ ] Generate strong passwords using secure random generators
+- [ ] Use strong JWT_SECRET and NEXTAUTH_SECRET (minimum 32 characters)
 - [ ] Enable HTTPS in production
 - [ ] Configure firewall rules
 - [ ] Enable audit logging
 - [ ] Regular security updates
 - [ ] Implement RBAC policies
-- [ ] Use secrets management (e.g., Vault)
+- [ ] Use secrets management (e.g., Vault) for production deployments
 
 ---
 
