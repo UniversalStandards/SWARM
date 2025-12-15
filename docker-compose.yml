@@ -22,7 +22,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://swarm:swarm123@postgres:5432/ai_swarm
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-swarm}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_swarm}
       - REDIS_URL=redis://redis:6379
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -52,16 +52,16 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=ai_swarm
-      - POSTGRES_USER=swarm
-      - POSTGRES_PASSWORD=swarm123
+      - POSTGRES_DB=${POSTGRES_DB:-ai_swarm}
+      - POSTGRES_USER=${POSTGRES_USER:-swarm}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - ai-swarm-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U swarm"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-swarm}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -100,8 +100,8 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
@@ -125,8 +125,8 @@ services:
     ports:
       - "5050:80"
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@swarm.local
-      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@swarm.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
     networks:
       - ai-swarm-network
     profiles:

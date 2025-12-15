@@ -28,8 +28,14 @@ cd SWARM
 
 ```bash
 cp .env.example .env
-# Edit .env and add your API keys
+# Edit .env and configure the following required variables:
+# - Add your AI provider API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+# - Set secure database password (POSTGRES_PASSWORD)
+# - Set secure Grafana admin password (GRAFANA_ADMIN_PASSWORD)
+# - Configure other credentials as needed
 ```
+
+**Security Note:** Never use default or weak passwords in production. Generate strong passwords using a password manager or tools like `pwgen`.
 
 ### Step 3: Start All Services
 
@@ -40,9 +46,11 @@ docker-compose up -d
 ### Step 4: Access the Application
 
 - **Web UI:** http://localhost:3000
-- **Grafana:** http://localhost:3001 (admin/admin)
+- **Grafana:** http://localhost:3001 (use credentials from .env: GRAFANA_ADMIN_USER/GRAFANA_ADMIN_PASSWORD)
 - **Prometheus:** http://localhost:9090
 - **Jaeger:** http://localhost:16686
+
+**Note:** Default credentials have been removed for security. Use the credentials you configured in your `.env` file.
 
 ---
 
