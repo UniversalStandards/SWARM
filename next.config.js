@@ -10,8 +10,11 @@ const nextConfig = {
     optimizePackageImports: ['lucide-react', 'framer-motion'],
   },
   // Enable static export for GitHub Pages or standalone for Docker
-  output: process.env.EXPORT_MODE === 'static' ? 'export' : 
-          process.env.STANDALONE_OUTPUT === 'true' ? 'standalone' : undefined,
+  output: (() => {
+    if (process.env.EXPORT_MODE === 'static') return 'export';
+    if (process.env.STANDALONE_OUTPUT === 'true') return 'standalone';
+    return undefined;
+  })(),
   // API routes work in development, but for static export you'll need serverless functions
   async headers() {
     return [
