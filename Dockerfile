@@ -15,6 +15,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
+# Install all dependencies (including devDependencies for build)
 RUN npm ci && \
     npm cache clean --force
 
@@ -22,12 +23,13 @@ RUN npm ci && \
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage
+# Copy dependencies from deps stage (includes devDependencies needed for build)
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build application
+# Build application with standalone output for optimized production bundle
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV STANDALONE_OUTPUT=true
 RUN npm run build
 
 # Stage 3: Runner
