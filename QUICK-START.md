@@ -31,11 +31,11 @@ cd SWARM
 cp .env.docker.example .env
 
 # Generate secure passwords (recommended)
-echo "POSTGRES_PASSWORD=$(openssl rand -base64 24)" >> .env
-echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> .env
-echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
-echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 16)" >> .env
-echo "PGADMIN_DEFAULT_PASSWORD=$(openssl rand -base64 16)" >> .env
+sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -base64 24)/" .env
+sed -i "s/^NEXTAUTH_SECRET=.*/NEXTAUTH_SECRET=$(openssl rand -base64 32)/" .env
+sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -base64 32)/" .env
+sed -i "s/^GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 16)/" .env
+sed -i "s/^PGADMIN_DEFAULT_PASSWORD=.*/PGADMIN_DEFAULT_PASSWORD=$(openssl rand -base64 16)/" .env
 
 # Edit .env and add your AI provider API keys
 # OPENAI_API_KEY=your_key_here
