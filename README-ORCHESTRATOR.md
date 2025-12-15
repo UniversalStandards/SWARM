@@ -1,7 +1,7 @@
 # AI Agent Swarm Orchestrator - Enterprise Edition
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-US--SPURS-green.svg)
+![License](https://img.shields.io/badge/license-Proprietary-red.svg)
 ![Classification](https://img.shields.io/badge/classification-OFFICIAL%20USE%20ONLY-yellow.svg)
 
 ## 🚀 Multi-Agent Intelligence Orchestration Platform
