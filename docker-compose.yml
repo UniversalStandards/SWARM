@@ -28,6 +28,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-swarm}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ai_swarm}
+      - DATABASE_URL=postgresql://swarm:${POSTGRES_PASSWORD}@postgres:5432/ai_swarm
       - REDIS_URL=redis://redis:6379
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -59,6 +60,8 @@ services:
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-ai_swarm}
       - POSTGRES_USER=${POSTGRES_USER:-swarm}
+      - POSTGRES_DB=ai_swarm
+      - POSTGRES_USER=swarm
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -106,6 +109,7 @@ services:
       - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - grafana-data:/var/lib/grafana
@@ -131,6 +135,7 @@ services:
       - "5050:80"
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@swarm.local}
+      - PGADMIN_DEFAULT_EMAIL=admin@swarm.local
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
     networks:
       - ai-swarm-network
