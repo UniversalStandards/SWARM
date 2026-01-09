@@ -1,0 +1,22 @@
+# Default policy (starter)
+# Treat this as an allowlist template.
+
+version: 1
+risk_defaults:
+  tool_execution: "deny"
+
+allow:
+  tools:
+    - name: "http"
+      constraints:
+        domains_allowlist: ["example.com"]
+    - name: "github"
+      constraints:
+        repos_allowlist: []
+
+audit:
+  enabled: true
+  redact:
+    - "token"
+    - "password"
+    - "secret"
