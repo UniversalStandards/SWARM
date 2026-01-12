@@ -1,0 +1,10 @@
+# OpenTelemetry starter config
+service:
+  name: project-swarm
+tracing:
+  enabled: true
+metrics:
+  enabled: true
+logging:
+  format: json
+  redact_fields: ["token","password","secret"]

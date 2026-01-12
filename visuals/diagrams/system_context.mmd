@@ -1,0 +1,9 @@
+flowchart LR
+  User-->CLI
+  CLI-->Runtime
+  Runtime-->Agents
+  Runtime-->Tools
+  Agents-->Memory
+  Tools-->External[(External Systems)]
+  Runtime-->Observability
+  Runtime-->Policy
