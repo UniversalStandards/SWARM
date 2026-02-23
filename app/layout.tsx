@@ -1,14 +1,13 @@
-import './globals.css';
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { Providers } from './providers';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AI Swarm Orchestrator | Enterprise Edition',
-  description: 'Next-generation AI agent orchestration platform for autonomous software development',
-  keywords: ['AI', 'agents', 'orchestration', 'automation', 'development', 'Claude', 'GPT-4', 'workflow'],
-  authors: [{ name: 'US-SPURS Technology Division' }],
-  viewport: 'width=device-width, initial-scale=1',
-  themeColor: '#0891b2',
+  title: 'SWARM - AI Agent Orchestration Platform',
+  description: 'Revolutionary multi-agent intelligence orchestration platform enabling parallel coordination at massive scale',
 };
 
 export default function RootLayout({
@@ -17,12 +16,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <head />
-      <body className="font-sans antialiased">
-        <Providers>
-          {children}
-        </Providers>
+    <html lang="en">
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
