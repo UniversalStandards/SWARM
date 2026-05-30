@@ -45,7 +45,7 @@ const initialSteps: SetupStep[] = [
   },
 ];
 
-export const useSetupStore = create<SetupStore>()(n  persist(
+export const useSetupStore = create<SetupStore>()(persist(
     (set) => ({
       currentStep: 1,
       steps: initialSteps,
